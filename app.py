@@ -47,9 +47,9 @@ def predict_cell(cell_img):
     x_off = (size - w) // 2
     square[y_off:y_off+h, x_off:x_off+w] = gray
 
-    resized = cv2.resize(square, (50, 50))
+    resized = cv2.resize(square, (32, 32))
     normalized = resized / 255.0
-    ready = normalized.reshape(1, 50, 50, 1).astype(np.float32)
+    ready = normalized.reshape(1, 32, 32, 1).astype(np.float32)
     input_name = session.get_inputs()[0].name
     prediction = session.run(None, {input_name: ready})[0]
     class_index = str(np.argmax(prediction))
