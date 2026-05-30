@@ -41,19 +41,8 @@ def predict_cell(cell_img):
 def find_and_predict_all(image_array):
     h, w = image_array.shape[:2]
 
-    # Step 1: Find the dot region (ignore text at bottom)
-    gray_check = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
-    _, thresh_check = cv2.threshold(gray_check, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    row_sums = np.sum(thresh_check, axis=1)
-    dot_rows = np.where(row_sums > 100)[0]
-
-    if len(dot_rows) > 0:
-        y_start = max(0, dot_rows[0] - 5)
-        # FIX: crop only the Braille dot rows, not beyond
-        y_end = min(h, dot_rows[-1] + 10)  # was: dot_rows[0] + 0.5*(range) — wrong!
-        image_array = image_array[y_start:y_end, :]
-    else:
-        image_array = image_array[:int(h * 0.67), :]  # fallback: top 2/3
+    # Crop only top 50% — removes the printed "I LOVE YOU" text at bottom
+    image_array = image_array[:int(h * 0.50), :]
 
     gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -83,12 +72,19 @@ def find_and_predict_all(image_array):
 
     avg_gap = np.median([g[2] for g in gaps])
 
-    # FIX: changed from 2.0 to 2.5 — less aggressive splitting
+    # DEBUG — show in Streamlit
+    st.write(f"🔍 Debug: {len(dots)} dots found | avg_gap = {avg_gap:.1f}px")
+    all_gaps = sorted([g[2] for g in gaps], reverse=True)
+    st.write(f"🔍 Top 10 gaps: {all_gaps[:10]}")
+
+    # Try threshold 1.8 — more splits
     cell_boundaries = [0]
     for (x1, x2, gap) in gaps:
-        if gap > avg_gap * 2.5:
+        if gap > avg_gap * 1.8:
             cell_boundaries.append((x1 + x2) // 2)
     cell_boundaries.append(image_array.shape[1])
+
+    st.write(f"🔍 Cells found: {len(cell_boundaries) - 1}")
 
     result_letters = []
     result_confidences = []
