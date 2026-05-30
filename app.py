@@ -29,10 +29,8 @@ def predict_cell(cell_img):
     if np.mean(gray) < 127:
         gray = cv2.bitwise_not(gray)
 
-    # Threshold to find dots
     _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     coords = cv2.findNonZero(thresh)
-
     if coords is not None:
         xb, yb, wb, hb = cv2.boundingRect(coords)
         pad = 8
@@ -42,12 +40,6 @@ def predict_cell(cell_img):
         hb = min(gray.shape[0] - yb, hb + 2*pad)
         gray = gray[yb:yb+hb, xb:xb+wb]
 
-    # If height > width, image is a vertical strip — rotate 90 degrees
-    h, w = gray.shape
-    if h > w * 1.5:
-        gray = cv2.rotate(gray, cv2.ROTATE_90_CLOCKWISE)
-
-    # Pad to square
     h, w = gray.shape
     size = max(h, w)
     square = np.ones((size, size), dtype=np.uint8) * 255
@@ -64,6 +56,7 @@ def predict_cell(cell_img):
     letter = reverse_map[class_index]
     confidence = float(np.max(prediction)) * 100
     return letter, confidence
+
 def find_and_predict_all(image_array):
     h, w = image_array.shape[:2]
 
@@ -139,9 +132,20 @@ def find_and_predict_all(image_array):
         x_end = min(cropped.shape[1], rx + padding)
         if x_end - x_start < 10:
             continue
+
         cell = cropped[:, x_start:x_end]
         if cell.size == 0:
             continue
+
+        # Crop vertically to dot rows only
+        cell_gray = cv2.cvtColor(cell, cv2.COLOR_RGB2GRAY)
+        _, cell_thresh = cv2.threshold(cell_gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        row_sums = np.sum(cell_thresh, axis=1)
+        dot_rows = np.where(row_sums > 50)[0]
+        if len(dot_rows) > 0:
+            y1 = max(0, dot_rows[0] - 10)
+            y2 = min(cell.shape[0], dot_rows[-1] + 10)
+            cell = cell[y1:y2, :]
 
         debug_cells.append(cell)
 
