@@ -41,7 +41,7 @@ def predict_cell(cell_img):
 def find_and_predict_all(image_array):
     h, w = image_array.shape[:2]
 
-    # Auto detect dot region only — ignores text at bottom
+    # Step 1: Find the dot region (ignore text at bottom)
     gray_check = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
     _, thresh_check = cv2.threshold(gray_check, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     row_sums = np.sum(thresh_check, axis=1)
@@ -49,10 +49,11 @@ def find_and_predict_all(image_array):
 
     if len(dot_rows) > 0:
         y_start = max(0, dot_rows[0] - 5)
-        y_end = min(h, dot_rows[0] + int((dot_rows[-1] - dot_rows[0]) * 0.5))
+        # FIX: crop only the Braille dot rows, not beyond
+        y_end = min(h, dot_rows[-1] + 10)  # was: dot_rows[0] + 0.5*(range) — wrong!
         image_array = image_array[y_start:y_end, :]
     else:
-        image_array = image_array[:int(h * 0.4), :]
+        image_array = image_array[:int(h * 0.67), :]  # fallback: top 2/3
 
     gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -62,10 +63,10 @@ def find_and_predict_all(image_array):
 
     dots = []
     for cnt in contours:
-        x, y, w, h = cv2.boundingRect(cnt)
-        area = w * h
+        x, y, cw, ch = cv2.boundingRect(cnt)
+        area = cw * ch
         if 20 < area < 500:
-            cx = x + w // 2
+            cx = x + cw // 2
             dots.append(cx)
 
     if not dots:
@@ -82,9 +83,10 @@ def find_and_predict_all(image_array):
 
     avg_gap = np.median([g[2] for g in gaps])
 
+    # FIX: changed from 2.0 to 2.5 — less aggressive splitting
     cell_boundaries = [0]
     for (x1, x2, gap) in gaps:
-        if gap > avg_gap * 1.5:
+        if gap > avg_gap * 2.5:
             cell_boundaries.append((x1 + x2) // 2)
     cell_boundaries.append(image_array.shape[1])
 
@@ -95,18 +97,14 @@ def find_and_predict_all(image_array):
     for i in range(len(cell_boundaries) - 1):
         x_start = cell_boundaries[i]
         x_end = cell_boundaries[i+1]
-
         if x_end - x_start < 10:
             continue
-
         cell = image_array[:, x_start:x_end]
         if cell.size == 0:
             continue
-
         letter, confidence = predict_cell(cell)
         result_letters.append(letter)
         result_confidences.append(confidence)
-
         cv2.rectangle(annotated, (x_start, 0), (x_end, image_array.shape[0]), (0, 255, 0), 2)
         cv2.putText(annotated, letter.upper(), (x_start + 2, 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
