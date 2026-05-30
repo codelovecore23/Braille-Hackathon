@@ -29,17 +29,25 @@ def predict_cell(cell_img):
     if np.mean(gray) < 127:
         gray = cv2.bitwise_not(gray)
 
+    # Threshold to find dots
     _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     coords = cv2.findNonZero(thresh)
+
     if coords is not None:
         xb, yb, wb, hb = cv2.boundingRect(coords)
-        pad = 5
+        pad = 8
         xb = max(0, xb - pad)
         yb = max(0, yb - pad)
         wb = min(gray.shape[1] - xb, wb + 2*pad)
         hb = min(gray.shape[0] - yb, hb + 2*pad)
         gray = gray[yb:yb+hb, xb:xb+wb]
 
+    # If height > width, image is a vertical strip — rotate 90 degrees
+    h, w = gray.shape
+    if h > w * 1.5:
+        gray = cv2.rotate(gray, cv2.ROTATE_90_CLOCKWISE)
+
+    # Pad to square
     h, w = gray.shape
     size = max(h, w)
     square = np.ones((size, size), dtype=np.uint8) * 255
@@ -56,7 +64,6 @@ def predict_cell(cell_img):
     letter = reverse_map[class_index]
     confidence = float(np.max(prediction)) * 100
     return letter, confidence
-
 def find_and_predict_all(image_array):
     h, w = image_array.shape[:2]
 
