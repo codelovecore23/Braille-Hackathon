@@ -41,67 +41,104 @@ def predict_cell(cell_img):
 def find_and_predict_all(image_array):
     h, w = image_array.shape[:2]
 
-    # Crop only top 50% — removes the printed "I LOVE YOU" text at bottom
-    image_array = image_array[:int(h * 0.50), :]
+    # Crop top 50% to remove printed text
+    cropped = image_array[:int(h * 0.50), :]
 
-    gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+    gray = cv2.cvtColor(cropped, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    dots = []
+    # Collect dot centers
+    dot_centers = []
     for cnt in contours:
         x, y, cw, ch = cv2.boundingRect(cnt)
         area = cw * ch
-        if 20 < area < 500:
+        if 20 < area < 600:
             cx = x + cw // 2
-            dots.append(cx)
+            cy = y + ch // 2
+            dot_centers.append((cx, cy))
 
-    if not dots:
-        return "", [], image_array
+    if not dot_centers:
+        return "", [], cropped
 
-    dots_x = sorted(set(dots))
-    gaps = []
-    for i in range(len(dots_x) - 1):
-        gap = dots_x[i+1] - dots_x[i]
-        gaps.append((dots_x[i], dots_x[i+1], gap))
+    # --- Step 1: Cluster dot x-positions into columns ---
+    xs = sorted([d[0] for d in dot_centers])
 
-    if not gaps:
-        return "", [], image_array
+    # Find gaps between consecutive x values
+    col_boundaries = []
+    for i in range(len(xs) - 1):
+        if xs[i+1] - xs[i] > 15:  # min gap to be a new column
+            col_boundaries.append((xs[i] + xs[i+1]) // 2)
 
-    avg_gap = np.median([g[2] for g in gaps])
+    # Assign each dot to a column
+    col_groups = []
+    prev = 0
+    for b in col_boundaries:
+        col_x = [x for x in xs if prev <= x < b]
+        if col_x:
+            col_groups.append(int(np.mean(col_x)))
+        prev = b
+    last_col = [x for x in xs if x >= prev]
+    if last_col:
+        col_groups.append(int(np.mean(last_col)))
 
-    # DEBUG — show in Streamlit
-    st.write(f"🔍 Debug: {len(dots)} dots found | avg_gap = {avg_gap:.1f}px")
-    all_gaps = sorted([g[2] for g in gaps], reverse=True)
-    st.write(f"🔍 Top 10 gaps: {all_gaps[:10]}")
+    st.write(f"🔍 Total columns detected: {len(col_groups)}")
+    st.write(f"🔍 Column x-positions: {col_groups}")
 
-    # Try threshold 1.8 — more splits
-    cell_boundaries = [0]
-    for (x1, x2, gap) in gaps:
-        if gap > avg_gap * 1.8:
-            cell_boundaries.append((x1 + x2) // 2)
-    cell_boundaries.append(image_array.shape[1])
+    # --- Step 2: Find large gaps between columns = word/letter boundaries ---
+    col_gaps = []
+    for i in range(len(col_groups) - 1):
+        gap = col_groups[i+1] - col_groups[i]
+        col_gaps.append(gap)
 
-    st.write(f"🔍 Cells found: {len(cell_boundaries) - 1}")
+    if not col_gaps:
+        return "", [], cropped
 
+    avg_col_gap = np.median(col_gaps)
+    st.write(f"🔍 Column gaps: {col_gaps}")
+    st.write(f"🔍 Avg column gap: {avg_col_gap:.1f}px")
+
+    # --- Step 3: Group columns into cells (2 columns per letter) ---
+    # Find which gaps are "large" (between letters or words)
+    cell_col_groups = []  # list of (left_col_x, right_col_x)
+    i = 0
+    while i < len(col_groups):
+        if i + 1 < len(col_groups):
+            gap = col_groups[i+1] - col_groups[i]
+            if gap < avg_col_gap * 2.0:
+                # These two columns form one Braille cell
+                cell_col_groups.append((col_groups[i], col_groups[i+1]))
+                i += 2
+            else:
+                # Single column cell (sparse letter like 'a')
+                cell_col_groups.append((col_groups[i], col_groups[i]))
+                i += 1
+        else:
+            cell_col_groups.append((col_groups[i], col_groups[i]))
+            i += 1
+
+    st.write(f"🔍 Letter cells formed: {len(cell_col_groups)}")
+
+    # --- Step 4: Crop and predict each cell ---
     result_letters = []
     result_confidences = []
-    annotated = image_array.copy()
+    annotated = cropped.copy()
+    padding = 20
 
-    for i in range(len(cell_boundaries) - 1):
-        x_start = cell_boundaries[i]
-        x_end = cell_boundaries[i+1]
+    for (lx, rx) in cell_col_groups:
+        x_start = max(0, lx - padding)
+        x_end = min(cropped.shape[1], rx + padding)
         if x_end - x_start < 10:
             continue
-        cell = image_array[:, x_start:x_end]
+        cell = cropped[:, x_start:x_end]
         if cell.size == 0:
             continue
         letter, confidence = predict_cell(cell)
         result_letters.append(letter)
         result_confidences.append(confidence)
-        cv2.rectangle(annotated, (x_start, 0), (x_end, image_array.shape[0]), (0, 255, 0), 2)
+        cv2.rectangle(annotated, (x_start, 0), (x_end, cropped.shape[0]), (0, 255, 0), 2)
         cv2.putText(annotated, letter.upper(), (x_start + 2, 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
