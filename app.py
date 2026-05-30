@@ -60,7 +60,23 @@ def predict_cell(cell_img):
 def find_and_predict_all(image_array):
     h, w = image_array.shape[:2]
 
-    cropped = image_array[:int(h * 0.50), :]
+    # Find actual dot region precisely using row sums
+    gray_full = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+    _, thresh_full = cv2.threshold(gray_full, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    row_sums = np.sum(thresh_full, axis=1)
+    dot_rows = np.where(row_sums > 200)[0]
+
+    if len(dot_rows) > 0:
+        y1 = max(0, dot_rows[0] - 15)
+        y2 = min(h, dot_rows[-1] + 15)
+        # Take only top half of detected region to exclude printed text
+        mid = (y1 + y2) // 2
+        cropped = image_array[y1:mid, :]
+    else:
+        cropped = image_array[:int(h * 0.40), :]
+
+    # Show what we cropped for debug
+    st.write(f"🔍 Cropped region shape: {cropped.shape}")
 
     gray = cv2.cvtColor(cropped, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -124,16 +140,15 @@ def find_and_predict_all(image_array):
 
     for idx, (lx, rx) in enumerate(cell_col_groups):
         if lx == rx:
-            padding = 50  # wider for single column letters
+            padding = 50
         else:
-            padding = 30  # wider for two column letters
+            padding = 30
 
         x_start = max(0, lx - padding)
         x_end = min(cropped.shape[1], rx + padding)
         if x_end - x_start < 10:
             continue
 
-        # Full height — no vertical crop
         cell = cropped[:, x_start:x_end]
         if cell.size == 0:
             continue
@@ -147,7 +162,6 @@ def find_and_predict_all(image_array):
         cv2.putText(annotated, letter.upper(), (x_start + 2, 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-    # Debug — show first 4 cell images
     st.write("🔍 Cell images sent to CNN:")
     cols = st.columns(4)
     for idx, cell_img in enumerate(debug_cells[:4]):
