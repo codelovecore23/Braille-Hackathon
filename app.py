@@ -39,6 +39,11 @@ def predict_cell(cell_img):
     return letter, confidence
 
 def find_and_predict_all(image_array):
+    h, w = image_array.shape[:2]
+    
+    # Crop only top 60% of image — removes text labels at bottom
+    image_array = image_array[:int(h * 0.6), :]
+    
     gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
@@ -51,7 +56,6 @@ def find_and_predict_all(image_array):
         area = w * h
         if 20 < area < 500:
             cx = x + w // 2
-            cy = y + h // 2
             dots.append(cx)
 
     if not dots:
@@ -66,14 +70,12 @@ def find_and_predict_all(image_array):
     if not gaps:
         return "", [], image_array
 
-    all_gaps = [g[2] for g in gaps]
-    avg_gap = np.median(all_gaps)
+    avg_gap = np.median([g[2] for g in gaps])
 
     cell_boundaries = [0]
     for (x1, x2, gap) in gaps:
         if gap > avg_gap * 1.5:
-            boundary = (x1 + x2) // 2
-            cell_boundaries.append(boundary)
+            cell_boundaries.append((x1 + x2) // 2)
     cell_boundaries.append(image_array.shape[1])
 
     result_letters = []
