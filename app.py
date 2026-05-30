@@ -14,20 +14,20 @@ st.set_page_config(page_title="BrailleVision", page_icon="⠃", layout="centered
 @st.cache_resource
 def load_resources():
     if not os.path.exists("braille_cnn.onnx"):
-        gdown.download("https://drive.google.com/uc?id=12CUhIdfRJqJQkuxVQ0WgCbEFctRAe1P4", "braille_cnn.onnx", quiet=False)
+        gdown.download("https://drive.google.com/uc?id=1gV_PIj8z7Qxu9TdAExfQyqFQw2e2mRAM", "braille_cnn.onnx", quiet=False)
     if not os.path.exists("reverse_map.json"):
-        gdown.download("https://drive.google.com/uc?id=1kkeMXthfkod3D7rxHk0NJGUad6-__vhs", "reverse_map.json", quiet=False)
+        gdown.download("https://drive.google.com/uc?id=15SyxE0eyfBg7uNO7qUog4hhG8d2udfTZ", "reverse_map.json", quiet=False)
     session = ort.InferenceSession("braille_cnn.onnx")
     with open("reverse_map.json") as f:
         reverse_map = json.load(f)
     return session, reverse_map
 
 session, reverse_map = load_resources()
+
 def predict_cell(cell_img):
     gray = cv2.cvtColor(cell_img, cv2.COLOR_RGB2GRAY)
     if np.mean(gray) < 127:
         gray = cv2.bitwise_not(gray)
-
     _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     coords = cv2.findNonZero(thresh)
     if coords is not None:
@@ -38,22 +38,15 @@ def predict_cell(cell_img):
         wb = min(gray.shape[1] - xb, wb + 2*pad)
         hb = min(gray.shape[0] - yb, hb + 2*pad)
         gray = gray[yb:yb+hb, xb:xb+wb]
-
     h, w = gray.shape
     size = max(h, w)
     square = np.ones((size, size), dtype=np.uint8) * 255
     y_off = (size - h) // 2
     x_off = (size - w) // 2
     square[y_off:y_off+h, x_off:x_off+w] = gray
-
-    # Auto-detect input size from model
-    input_shape = session.get_inputs()[0].shape
-    img_size = input_shape[1]  # height dimension
-    
-    resized = cv2.resize(square, (img_size, img_size))
+    resized = cv2.resize(square, (50, 50))
     normalized = resized / 255.0
-    ready = normalized.reshape(1, img_size, img_size, 1).astype(np.float32)
-    
+    ready = normalized.reshape(1, 50, 50, 1).astype(np.float32)
     input_name = session.get_inputs()[0].name
     prediction = session.run(None, {input_name: ready})[0]
     class_index = str(np.argmax(prediction))
@@ -63,30 +56,21 @@ def predict_cell(cell_img):
 
 def find_and_predict_all(image_array):
     h, w = image_array.shape[:2]
-
-    # Find actual dot region precisely using row sums
     gray_full = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
     _, thresh_full = cv2.threshold(gray_full, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     row_sums = np.sum(thresh_full, axis=1)
     dot_rows = np.where(row_sums > 200)[0]
-
     if len(dot_rows) > 0:
         y1 = max(0, dot_rows[0] - 15)
         y2 = min(h, dot_rows[-1] + 15)
-        # Take only top half of detected region to exclude printed text
         mid = (y1 + y2) // 2
         cropped = image_array[y1:mid, :]
     else:
         cropped = image_array[:int(h * 0.40), :]
-
-    # Show what we cropped for debug
-    st.write(f"🔍 Cropped region shape: {cropped.shape}")
-
     gray = cv2.cvtColor(cropped, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
     dot_centers = []
     for cnt in contours:
         x, y, cw, ch = cv2.boundingRect(cnt)
@@ -95,17 +79,13 @@ def find_and_predict_all(image_array):
             cx = x + cw // 2
             cy = y + ch // 2
             dot_centers.append((cx, cy))
-
     if not dot_centers:
         return "", [], cropped
-
     xs = sorted([d[0] for d in dot_centers])
-
     col_boundaries = []
     for i in range(len(xs) - 1):
         if xs[i+1] - xs[i] > 10:
             col_boundaries.append((xs[i] + xs[i+1]) // 2)
-
     col_groups = []
     prev = 0
     for b in col_boundaries:
@@ -116,12 +96,9 @@ def find_and_predict_all(image_array):
     last_col = [x for x in xs if x >= prev]
     if last_col:
         col_groups.append(int(np.mean(last_col)))
-
     if len(col_groups) < 2:
         return "", [], cropped
-
     SAME_CELL_THRESHOLD = 35
-
     cell_col_groups = []
     i = 0
     while i < len(col_groups):
@@ -136,41 +113,24 @@ def find_and_predict_all(image_array):
         else:
             cell_col_groups.append((col_groups[i], col_groups[i]))
             i += 1
-
     result_letters = []
     result_confidences = []
     annotated = cropped.copy()
-    debug_cells = []
-
-    for idx, (lx, rx) in enumerate(cell_col_groups):
-        if lx == rx:
-            padding = 50
-        else:
-            padding = 30
-
+    for (lx, rx) in cell_col_groups:
+        padding = 50 if lx == rx else 30
         x_start = max(0, lx - padding)
         x_end = min(cropped.shape[1], rx + padding)
         if x_end - x_start < 10:
             continue
-
         cell = cropped[:, x_start:x_end]
         if cell.size == 0:
             continue
-
-        debug_cells.append(cell)
-
         letter, confidence = predict_cell(cell)
         result_letters.append(letter)
         result_confidences.append(confidence)
         cv2.rectangle(annotated, (x_start, 0), (x_end, cropped.shape[0]), (0, 255, 0), 2)
         cv2.putText(annotated, letter.upper(), (x_start + 2, 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-
-    st.write("🔍 Cell images sent to CNN:")
-    cols = st.columns(4)
-    for idx, cell_img in enumerate(debug_cells[:4]):
-        cols[idx].image(cell_img, caption=f"Cell {idx}", width=80)
-
     sentence = "".join(result_letters)
     return sentence, result_confidences, annotated
 
