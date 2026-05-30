@@ -23,7 +23,6 @@ def load_resources():
     return session, reverse_map
 
 session, reverse_map = load_resources()
-
 def predict_cell(cell_img):
     gray = cv2.cvtColor(cell_img, cv2.COLOR_RGB2GRAY)
     if np.mean(gray) < 127:
@@ -47,9 +46,14 @@ def predict_cell(cell_img):
     x_off = (size - w) // 2
     square[y_off:y_off+h, x_off:x_off+w] = gray
 
-    resized = cv2.resize(square, (32, 32))
+    # Auto-detect input size from model
+    input_shape = session.get_inputs()[0].shape
+    img_size = input_shape[1]  # height dimension
+    
+    resized = cv2.resize(square, (img_size, img_size))
     normalized = resized / 255.0
-    ready = normalized.reshape(1, 32, 32, 1).astype(np.float32)
+    ready = normalized.reshape(1, img_size, img_size, 1).astype(np.float32)
+    
     input_name = session.get_inputs()[0].name
     prediction = session.run(None, {input_name: ready})[0]
     class_index = str(np.argmax(prediction))
