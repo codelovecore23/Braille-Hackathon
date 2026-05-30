@@ -28,7 +28,28 @@ def predict_cell(cell_img):
     gray = cv2.cvtColor(cell_img, cv2.COLOR_RGB2GRAY)
     if np.mean(gray) < 127:
         gray = cv2.bitwise_not(gray)
-    resized = cv2.resize(gray, (50, 50))
+
+    # Tight bounding box around dots only
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    coords = cv2.findNonZero(thresh)
+    if coords is not None:
+        xb, yb, wb, hb = cv2.boundingRect(coords)
+        pad = 5
+        xb = max(0, xb - pad)
+        yb = max(0, yb - pad)
+        wb = min(gray.shape[1] - xb, wb + 2*pad)
+        hb = min(gray.shape[0] - yb, hb + 2*pad)
+        gray = gray[yb:yb+hb, xb:xb+wb]
+
+    # Pad to square before resize
+    h, w = gray.shape
+    size = max(h, w)
+    square = np.ones((size, size), dtype=np.uint8) * 255
+    y_off = (size - h) // 2
+    x_off = (size - w) // 2
+    square[y_off:y_off+h, x_off:x_off+w] = gray
+
+    resized = cv2.resize(square, (50, 50))
     normalized = resized / 255.0
     ready = normalized.reshape(1, 50, 50, 1).astype(np.float32)
     input_name = session.get_inputs()[0].name
@@ -41,7 +62,7 @@ def predict_cell(cell_img):
 def find_and_predict_all(image_array):
     h, w = image_array.shape[:2]
 
-    # Crop top 50% to remove printed text
+    # Crop top 50% to remove printed text at bottom
     cropped = image_array[:int(h * 0.50), :]
 
     gray = cv2.cvtColor(cropped, cv2.COLOR_RGB2GRAY)
@@ -63,16 +84,14 @@ def find_and_predict_all(image_array):
     if not dot_centers:
         return "", [], cropped
 
-    # --- Step 1: Cluster dot x-positions into columns ---
+    # Step 1: Cluster dot x-positions into columns
     xs = sorted([d[0] for d in dot_centers])
 
-    # Find gaps between consecutive x values
     col_boundaries = []
     for i in range(len(xs) - 1):
-        if xs[i+1] - xs[i] > 15:  # min gap to be a new column
+        if xs[i+1] - xs[i] > 15:
             col_boundaries.append((xs[i] + xs[i+1]) // 2)
 
-    # Assign each dot to a column
     col_groups = []
     prev = 0
     for b in col_boundaries:
@@ -84,44 +103,35 @@ def find_and_predict_all(image_array):
     if last_col:
         col_groups.append(int(np.mean(last_col)))
 
-    st.write(f"🔍 Total columns detected: {len(col_groups)}")
-    st.write(f"🔍 Column x-positions: {col_groups}")
-
-    # --- Step 2: Find large gaps between columns = word/letter boundaries ---
-    col_gaps = []
-    for i in range(len(col_groups) - 1):
-        gap = col_groups[i+1] - col_groups[i]
-        col_gaps.append(gap)
-
-    if not col_gaps:
+    if len(col_groups) < 2:
         return "", [], cropped
 
-    avg_col_gap = np.median(col_gaps)
-    st.write(f"🔍 Column gaps: {col_gaps}")
-    st.write(f"🔍 Avg column gap: {avg_col_gap:.1f}px")
+    # Step 2: Calculate gaps between columns
+    col_gaps = [col_groups[i+1] - col_groups[i] for i in range(len(col_groups) - 1)]
 
-    # --- Step 3: Group columns into cells (2 columns per letter) ---
-    # Find which gaps are "large" (between letters or words)
-    cell_col_groups = []  # list of (left_col_x, right_col_x)
+    # Step 3: Fixed threshold — small gap = same cell, large gap = new cell
+    # From your debug: small gaps ~22px, large gaps ~60px
+    # So 35px is a clean threshold between them
+    SAME_CELL_THRESHOLD = 35
+
+    cell_col_groups = []
     i = 0
     while i < len(col_groups):
         if i + 1 < len(col_groups):
             gap = col_groups[i+1] - col_groups[i]
-            if gap < avg_col_gap * 2.0:
-                # These two columns form one Braille cell
+            if gap < SAME_CELL_THRESHOLD:
+                # Two columns = one Braille letter
                 cell_col_groups.append((col_groups[i], col_groups[i+1]))
                 i += 2
             else:
-                # Single column cell (sparse letter like 'a')
+                # Single column letter (like 'I' or 'A')
                 cell_col_groups.append((col_groups[i], col_groups[i]))
                 i += 1
         else:
             cell_col_groups.append((col_groups[i], col_groups[i]))
             i += 1
 
-    st.write(f"🔍 Letter cells formed: {len(cell_col_groups)}")
-
-    # --- Step 4: Crop and predict each cell ---
+    # Step 4: Crop and predict each cell
     result_letters = []
     result_confidences = []
     annotated = cropped.copy()
@@ -144,6 +154,7 @@ def find_and_predict_all(image_array):
 
     sentence = "".join(result_letters)
     return sentence, result_confidences, annotated
+
 def speak(text):
     tts = gTTS(text=text, lang='en')
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
