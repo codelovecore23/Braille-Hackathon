@@ -109,27 +109,27 @@ def find_and_predict_all(image_array):
     # Step 2: Calculate gaps between columns
     col_gaps = [col_groups[i+1] - col_groups[i] for i in range(len(col_groups) - 1)]
 
-    # Step 3: Fixed threshold — small gap = same cell, large gap = new cell
-    # From your debug: small gaps ~22px, large gaps ~60px
-    # So 35px is a clean threshold between them
-    SAME_CELL_THRESHOLD = 35
+# Step 3: Group columns into cells
+# Large gap (>35) = letter boundary, small gap = within same letter
+SAME_CELL_THRESHOLD = 35
 
-    cell_col_groups = []
-    i = 0
-    while i < len(col_groups):
-        if i + 1 < len(col_groups):
-            gap = col_groups[i+1] - col_groups[i]
-            if gap < SAME_CELL_THRESHOLD:
-                # Two columns = one Braille letter
-                cell_col_groups.append((col_groups[i], col_groups[i+1]))
-                i += 2
-            else:
-                # Single column letter (like 'I' or 'A')
-                cell_col_groups.append((col_groups[i], col_groups[i]))
-                i += 1
+cell_col_groups = []
+i = 0
+while i < len(col_groups):
+    if i + 1 < len(col_groups):
+        gap = col_groups[i+1] - col_groups[i]
+        if gap < SAME_CELL_THRESHOLD:
+            # Small gap → two columns = one letter
+            cell_col_groups.append((col_groups[i], col_groups[i+1]))
+            i += 2
         else:
+            # Large gap → this column stands alone = one letter
             cell_col_groups.append((col_groups[i], col_groups[i]))
             i += 1
+    else:
+        # Last column alone
+        cell_col_groups.append((col_groups[i], col_groups[i]))
+        i += 1
 
     # Step 4: Crop and predict each cell
     result_letters = []
