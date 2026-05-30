@@ -38,80 +38,45 @@ def predict_cell(cell_img):
 
 def find_and_predict_all(image_array):
     h, w = image_array.shape[:2]
+
     gray_full = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
     _, thresh_full = cv2.threshold(gray_full, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     row_sums = np.sum(thresh_full, axis=1)
-    dot_rows = np.where(row_sums > 200)[0]
-    if len(dot_rows) > 0:
-        y1 = max(0, dot_rows[0] - 15)
-        y2 = min(h, dot_rows[-1] + 15)
-        cropped = image_array[y1:y2, :]
-    else:
-        cropped = image_array[:int(h * 0.40), :]
-    gray = cv2.cvtColor(cropped, cv2.COLOR_RGB2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    dot_centers = []
-    for cnt in contours:
-        x, y, cw, ch = cv2.boundingRect(cnt)
-        area = cw * ch
-        if 20 < area < 5000:
-            cx = x + cw // 2
-            cy = y + ch // 2
-            dot_centers.append((cx, cy))
-    if not dot_centers:
-        return "", [], cropped
-    xs = sorted([d[0] for d in dot_centers])
-    col_boundaries = []
-    for i in range(len(xs) - 1):
-        if xs[i+1] - xs[i] > 10:
-            col_boundaries.append((xs[i] + xs[i+1]) // 2)
-    col_groups = []
-    prev = 0
-    for b in col_boundaries:
-        col_x = [x for x in xs if prev <= x < b]
-        if col_x:
-            col_groups.append(int(np.mean(col_x)))
-        prev = b
-    last_col = [x for x in xs if x >= prev]
-    if last_col:
-        col_groups.append(int(np.mean(last_col)))
-    if not col_groups:
-        return "", [], cropped
-    SAME_CELL_THRESHOLD = 35
-    cell_col_groups = []
-    i = 0
-    while i < len(col_groups):
-        if i + 1 < len(col_groups):
-            gap = col_groups[i+1] - col_groups[i]
-            if gap < SAME_CELL_THRESHOLD:
-                cell_col_groups.append((col_groups[i], col_groups[i+1]))
-                i += 2
-            else:
-                cell_col_groups.append((col_groups[i], col_groups[i]))
-                i += 1
-        else:
-            cell_col_groups.append((col_groups[i], col_groups[i]))
-            i += 1
+    col_sums = np.sum(thresh_full, axis=0)
+
+    dot_rows = np.where(row_sums > 50)[0]
+    dot_cols = np.where(col_sums > 50)[0]
+
+    if len(dot_rows) == 0 or len(dot_cols) == 0:
+        return "", [], image_array
+
+    # Find column gaps to split into cells
+    col_positions = dot_cols.tolist()
+    cell_splits = [0]
+    for i in range(len(col_positions) - 1):
+        if col_positions[i+1] - col_positions[i] > 15:
+            cell_splits.append((col_positions[i] + col_positions[i+1]) // 2)
+    cell_splits.append(w)
+
     result_letters = []
     result_confidences = []
-    annotated = cropped.copy()
-    for (lx, rx) in cell_col_groups:
-        padding = 50 if lx == rx else 30
-        x_start = max(0, lx - padding)
-        x_end = min(cropped.shape[1], rx + padding)
-        if x_end - x_start < 10:
+    annotated = image_array.copy()
+
+    for i in range(len(cell_splits) - 1):
+        x_start = cell_splits[i]
+        x_end = cell_splits[i+1]
+        if x_end - x_start < 5:
             continue
-        cell = cropped[:, x_start:x_end]
+        cell = image_array[:, x_start:x_end]
         if cell.size == 0:
             continue
         letter, confidence = predict_cell(cell)
         result_letters.append(letter)
         result_confidences.append(confidence)
-        cv2.rectangle(annotated, (x_start, 0), (x_end, cropped.shape[0]), (0, 255, 0), 2)
+        cv2.rectangle(annotated, (x_start, 0), (x_end, h), (0, 255, 0), 2)
         cv2.putText(annotated, letter.upper(), (x_start + 2, 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
     sentence = "".join(result_letters)
     return sentence, result_confidences, annotated
 
