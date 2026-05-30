@@ -144,7 +144,6 @@ def find_and_predict_all(image_array):
 
     sentence = "".join(result_letters)
     return sentence, result_confidences, annotated
-
 def speak(text):
     tts = gTTS(text=text, lang='en')
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
