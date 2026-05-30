@@ -1,0 +1,7 @@
+streamlit
+onnxruntime
+opencv-python-headless
+gdown
+gtts
+Pillow
+numpy
