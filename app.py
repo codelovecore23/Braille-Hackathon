@@ -109,35 +109,40 @@ def find_and_predict_all(image_array):
     # Step 2: Calculate gaps between columns
     col_gaps = [col_groups[i+1] - col_groups[i] for i in range(len(col_groups) - 1)]
 
-# Step 3: Group columns into cells
-# Large gap (>35) = letter boundary, small gap = within same letter
-SAME_CELL_THRESHOLD = 35
+    # Step 3: Group columns into cells
+    SAME_CELL_THRESHOLD = 35
 
-cell_col_groups = []
-i = 0
-while i < len(col_groups):
-    if i + 1 < len(col_groups):
-        gap = col_groups[i+1] - col_groups[i]
-        if gap < SAME_CELL_THRESHOLD:
-            # Small gap → two columns = one letter
-            cell_col_groups.append((col_groups[i], col_groups[i+1]))
-            i += 2
+    cell_col_groups = []
+    i = 0
+    while i < len(col_groups):
+        if i + 1 < len(col_groups):
+            gap = col_groups[i+1] - col_groups[i]
+            if gap < SAME_CELL_THRESHOLD:
+                # Small gap → two columns = one letter
+                cell_col_groups.append((col_groups[i], col_groups[i+1]))
+                i += 2
+            else:
+                # Large gap → single column letter
+                cell_col_groups.append((col_groups[i], col_groups[i]))
+                i += 1
         else:
-            # Large gap → this column stands alone = one letter
             cell_col_groups.append((col_groups[i], col_groups[i]))
             i += 1
-    else:
-        # Last column alone
-        cell_col_groups.append((col_groups[i], col_groups[i]))
-        i += 1
+
+    # Debug — remove after fixing
+    st.write("🔍 Cell pairings:", cell_col_groups)
 
     # Step 4: Crop and predict each cell
     result_letters = []
     result_confidences = []
     annotated = cropped.copy()
-    padding = 20
 
     for (lx, rx) in cell_col_groups:
+        if lx == rx:
+            padding = 35  # single column — wider crop
+        else:
+            padding = 20  # two columns — normal crop
+
         x_start = max(0, lx - padding)
         x_end = min(cropped.shape[1], rx + padding)
         if x_end - x_start < 10:
