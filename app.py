@@ -75,7 +75,7 @@ def find_and_predict_all(image_array):
     for cnt in contours:
         x, y, cw, ch = cv2.boundingRect(cnt)
         area = cw * ch
-        if 20 < area < 600:
+        if 20 < area < 5000:
             cx = x + cw // 2
             cy = y + ch // 2
             dot_centers.append((cx, cy))
