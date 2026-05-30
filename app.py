@@ -54,7 +54,7 @@ def find_and_predict_all(image_array):
     col_positions = dot_cols.tolist()
     cell_splits = [0]
     for i in range(len(col_positions) - 1):
-        if col_positions[i+1] - col_positions[i] > 15:
+        if col_positions[i+1] - col_positions[i] > 80:
             cell_splits.append((col_positions[i] + col_positions[i+1]) // 2)
     cell_splits.append(w)
 
