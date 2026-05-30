@@ -26,25 +26,7 @@ session, reverse_map = load_resources()
 
 def predict_cell(cell_img):
     gray = cv2.cvtColor(cell_img, cv2.COLOR_RGB2GRAY)
-    if np.mean(gray) < 127:
-        gray = cv2.bitwise_not(gray)
-    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    coords = cv2.findNonZero(thresh)
-    if coords is not None:
-        xb, yb, wb, hb = cv2.boundingRect(coords)
-        pad = 8
-        xb = max(0, xb - pad)
-        yb = max(0, yb - pad)
-        wb = min(gray.shape[1] - xb, wb + 2*pad)
-        hb = min(gray.shape[0] - yb, hb + 2*pad)
-        gray = gray[yb:yb+hb, xb:xb+wb]
-    h, w = gray.shape
-    size = max(h, w)
-    square = np.ones((size, size), dtype=np.uint8) * 255
-    y_off = (size - h) // 2
-    x_off = (size - w) // 2
-    square[y_off:y_off+h, x_off:x_off+w] = gray
-    resized = cv2.resize(square, (50, 50))
+    resized = cv2.resize(gray, (50, 50))
     normalized = resized / 255.0
     ready = normalized.reshape(1, 50, 50, 1).astype(np.float32)
     input_name = session.get_inputs()[0].name
