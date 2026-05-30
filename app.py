@@ -40,10 +40,20 @@ def predict_cell(cell_img):
 
 def find_and_predict_all(image_array):
     h, w = image_array.shape[:2]
-    
-    # Crop only top 60% of image — removes text labels at bottom
-    image_array = image_array[:int(h * 0.6), :]
-    
+
+    # Auto detect dot region only — ignores text at bottom
+    gray_check = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+    _, thresh_check = cv2.threshold(gray_check, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    row_sums = np.sum(thresh_check, axis=1)
+    dot_rows = np.where(row_sums > 100)[0]
+
+    if len(dot_rows) > 0:
+        y_start = max(0, dot_rows[0] - 5)
+        y_end = min(h, dot_rows[0] + int((dot_rows[-1] - dot_rows[0]) * 0.5))
+        image_array = image_array[y_start:y_end, :]
+    else:
+        image_array = image_array[:int(h * 0.4), :]
+
     gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
