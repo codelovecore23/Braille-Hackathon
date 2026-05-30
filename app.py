@@ -124,28 +124,19 @@ def find_and_predict_all(image_array):
 
     for idx, (lx, rx) in enumerate(cell_col_groups):
         if lx == rx:
-            padding = 35
+            padding = 50  # wider for single column letters
         else:
-            padding = 20
+            padding = 30  # wider for two column letters
 
         x_start = max(0, lx - padding)
         x_end = min(cropped.shape[1], rx + padding)
         if x_end - x_start < 10:
             continue
 
+        # Full height — no vertical crop
         cell = cropped[:, x_start:x_end]
         if cell.size == 0:
             continue
-
-        # Crop vertically to dot rows only
-        cell_gray = cv2.cvtColor(cell, cv2.COLOR_RGB2GRAY)
-        _, cell_thresh = cv2.threshold(cell_gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-        row_sums = np.sum(cell_thresh, axis=1)
-        dot_rows = np.where(row_sums > 50)[0]
-        if len(dot_rows) > 0:
-            y1 = max(0, dot_rows[0] - 10)
-            y2 = min(cell.shape[0], dot_rows[-1] + 10)
-            cell = cell[y1:y2, :]
 
         debug_cells.append(cell)
 
@@ -156,6 +147,7 @@ def find_and_predict_all(image_array):
         cv2.putText(annotated, letter.upper(), (x_start + 2, 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
+    # Debug — show first 4 cell images
     st.write("🔍 Cell images sent to CNN:")
     cols = st.columns(4)
     for idx, cell_img in enumerate(debug_cells[:4]):
