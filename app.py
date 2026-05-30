@@ -89,7 +89,7 @@ def find_and_predict_all(image_array):
 
     col_boundaries = []
     for i in range(len(xs) - 1):
-        if xs[i+1] - xs[i] > 15:
+        if xs[i+1] - xs[i] > 10:
             col_boundaries.append((xs[i] + xs[i+1]) // 2)
 
     col_groups = []
