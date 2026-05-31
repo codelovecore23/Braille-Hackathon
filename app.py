@@ -186,113 +186,218 @@ def speak(text):
     return tmp.name
 
 def show_results(sentence, confidences, annotated):
-    st.markdown(f'<div class="result-box">⠿ {sentence.upper()}</div>', unsafe_allow_html=True)
+    # Result box
+    st.markdown(f"""
+    <div style="
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        padding: 30px;
+        border-radius: 20px;
+        text-align: center;
+        margin: 15px 0;
+        box-shadow: 0 10px 30px rgba(102,126,234,0.4);
+    ">
+        <div style="color: #fff; font-size: 1rem; margin-bottom: 8px; opacity: 0.8;">
+            ✅ Recognized Braille Text
+        </div>
+        <div style="
+            color: white;
+            font-size: 3rem;
+            font-weight: 800;
+            letter-spacing: 10px;
+        ">{sentence.upper()}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Confidence
     if confidences:
         avg = sum(confidences) / len(confidences)
-        st.markdown(f'<div class="confidence-box">🎯 Model Confidence: {avg:.1f}% — {"Excellent" if avg > 90 else "Good" if avg > 70 else "Low"}</div>', unsafe_allow_html=True)
+        color = "#43A047" if avg > 90 else "#FB8C00" if avg > 70 else "#E53935"
+        label = "Excellent 🔥" if avg > 90 else "Good 👍" if avg > 70 else "Low ⚠️"
+        st.markdown(f"""
+        <div style="
+            background: #1e1e2e;
+            border: 2px solid {color};
+            border-radius: 12px;
+            padding: 12px 20px;
+            text-align: center;
+            color: {color};
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+        ">
+            🎯 Confidence: {avg:.1f}% — {label}
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Image and buttons
     col1, col2 = st.columns([1, 1])
     with col1:
-        st.image(annotated, caption="🟢 Detected Cells", width=240)
+        st.image(annotated, caption="🟢 Detected Cells", width=220)
+
     with col2:
-        st.markdown("#### 🔊 Listen")
-        st.markdown("Click below to hear the recognized text read aloud:")
-        if st.button("▶️ Read Aloud", use_container_width=True, type="primary"):
+        st.markdown("""
+        <div style="
+            background: #1e1e2e;
+            border-radius: 14px;
+            padding: 18px;
+            height: 100%;
+        ">
+            <div style="color: #90CAF9; font-size: 0.9rem; margin-bottom: 10px;">
+                📋 Recognized Text
+            </div>
+            <div style="
+                background: #2a2a3e;
+                border-radius: 8px;
+                padding: 12px;
+                font-size: 1.5rem;
+                font-weight: bold;
+                color: #ffffff;
+                letter-spacing: 6px;
+                text-align: center;
+                margin-bottom: 12px;
+            ">""" + sentence.upper() + """</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("🔊 Read Aloud", use_container_width=True, type="primary"):
             with st.spinner("Generating audio..."):
                 audio = speak(sentence)
                 st.audio(audio)
-        st.markdown("#### 📋 Copy Text")
-        st.code(sentence.upper(), language=None)
 
-# ── HERO SECTION ──
+# ── HERO ──
 st.markdown("""
-<div class="hero">
-    <div class="hero-title">⠃ BrailleVision</div>
-    <div class="hero-subtitle">Real-time Physical Braille Recognition using Camera AI</div>
-    <div class="hero-badge">🏆 BrailleVision Hackathon 2026</div>
+<div style="
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    padding: 35px 20px;
+    border-radius: 20px;
+    text-align: center;
+    margin-bottom: 20px;
+">
+    <div style="font-size: 2.8rem; font-weight: 800; color: white;">⠃ BrailleVision</div>
+    <div style="font-size: 1rem; color: #90CAF9; margin-top: 6px;">
+        Real-time Physical Braille Recognition using Camera AI
+    </div>
+    <div style="
+        display: inline-block;
+        background: #1E88E5;
+        color: white;
+        padding: 5px 16px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        margin-top: 10px;
+    ">🏆 BrailleVision Hackathon 2026</div>
 </div>
 """, unsafe_allow_html=True)
 
-# ── STATS ROW ──
+# ── STATS ──
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("🧠 Model Accuracy", "99%", "CNN")
-with col2:
-    st.metric("🔤 Classes", "26", "A to Z")
-with col3:
-    st.metric("⚡ Processing", "Real-time", "Fast")
-
-st.divider()
-
-# ── HOW IT WORKS ──
-with st.expander("🔍 How BrailleVision Works", expanded=False):
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown('<div class="step-box">📷 <b>Step 1</b><br>Upload or capture a Braille image using camera</div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown('<div class="step-box">🔬 <b>Step 2</b><br>OpenCV detects and segments Braille dot cells</div>', unsafe_allow_html=True)
-    with c3:
-        st.markdown('<div class="step-box">🧠 <b>Step 3</b><br>CNN predicts each letter → Text + Speech output</div>', unsafe_allow_html=True)
-
-    st.markdown("#### 🛠️ Tech Stack")
     st.markdown("""
-    <span class="tech-badge">Python</span>
-    <span class="tech-badge">TensorFlow</span>
-    <span class="tech-badge">OpenCV</span>
-    <span class="tech-badge">ONNX Runtime</span>
-    <span class="tech-badge">Streamlit</span>
-    <span class="tech-badge">gTTS</span>
+    <div style="background:#1e1e2e; border-radius:14px; padding:18px; text-align:center; border-top: 3px solid #1E88E5;">
+        <div style="font-size:2rem; font-weight:800; color:#42A5F5;">99%</div>
+        <div style="color:#aaa; font-size:0.85rem;">🧠 Model Accuracy</div>
+    </div>
+    """, unsafe_allow_html=True)
+with col2:
+    st.markdown("""
+    <div style="background:#1e1e2e; border-radius:14px; padding:18px; text-align:center; border-top: 3px solid #AB47BC;">
+        <div style="font-size:2rem; font-weight:800; color:#CE93D8;">26</div>
+        <div style="color:#aaa; font-size:0.85rem;">🔤 A to Z Classes</div>
+    </div>
+    """, unsafe_allow_html=True)
+with col3:
+    st.markdown("""
+    <div style="background:#1e1e2e; border-radius:14px; padding:18px; text-align:center; border-top: 3px solid #43A047;">
+        <div style="font-size:2rem; font-weight:800; color:#66BB6A;">Fast</div>
+        <div style="color:#aaa; font-size:0.85rem;">⚡ Real-time</div>
+    </div>
     """, unsafe_allow_html=True)
 
 st.divider()
 
-# ── MAIN TABS ──
+# ── HOW IT WORKS ──
+with st.expander("🔍 How BrailleVision Works"):
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown("""
+        <div style="background:#1e1e2e; border-radius:12px; padding:15px; border-left:4px solid #1E88E5;">
+            <div style="color:#42A5F5; font-weight:700;">📷 Step 1</div>
+            <div style="color:#ddd; font-size:0.85rem; margin-top:5px;">Upload or capture Braille image</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with c2:
+        st.markdown("""
+        <div style="background:#1e1e2e; border-radius:12px; padding:15px; border-left:4px solid #AB47BC;">
+            <div style="color:#CE93D8; font-weight:700;">🔬 Step 2</div>
+            <div style="color:#ddd; font-size:0.85rem; margin-top:5px;">OpenCV detects Braille dot cells</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with c3:
+        st.markdown("""
+        <div style="background:#1e1e2e; border-radius:12px; padding:15px; border-left:4px solid #43A047;">
+            <div style="color:#66BB6A; font-weight:700;">🧠 Step 3</div>
+            <div style="color:#ddd; font-size:0.85rem; margin-top:5px;">CNN predicts letters → Speech output</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+st.divider()
+
+# ── TABS ──
 tab1, tab2 = st.tabs(["📷 Upload Image", "🎥 Live Camera"])
 
 with tab1:
-    st.markdown('<div class="info-box">💡 Upload a clear photo of physical or embossed Braille paper for best results</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div style="background:#1e3a5f; border-radius:10px; padding:12px 16px; color:#90CAF9; font-size:0.9rem; margin-bottom:12px;">
+        💡 Upload a clear photo of physical Braille paper for best results
+    </div>
+    """, unsafe_allow_html=True)
+
     uploaded = st.file_uploader("Choose a Braille image", type=["jpg", "jpeg", "png"])
     if uploaded:
         img = Image.open(uploaded).convert("RGB")
         img_array = np.array(img)
+
         col1, col2 = st.columns([1, 1])
         with col1:
-            st.image(img, caption="📄 Uploaded Image", width=240)
+            st.image(img, caption="📄 Uploaded Image", width=220)
         with col2:
-            st.markdown("#### ⚙️ Processing")
-            with st.spinner("🔍 Analyzing Braille dots..."):
+            with st.spinner("🔍 Analyzing Braille..."):
                 sentence, confidences, annotated = find_and_predict_all(img_array)
             if sentence:
-                st.success("✅ Braille detected successfully!")
+                st.success("✅ Braille detected!")
             else:
-                st.error("❌ No Braille detected")
+                st.error("❌ Not detected")
+
         if sentence:
             st.divider()
-            st.markdown("### 📝 Recognition Result")
             show_results(sentence, confidences, annotated)
         else:
-            st.warning("⚠️ No Braille cells detected. Try a clearer image with better lighting.")
+            st.warning("⚠️ No Braille detected. Try a clearer image.")
 
 with tab2:
-    st.markdown('<div class="info-box">📸 Point your camera directly at the Braille text. Make sure lighting is good.</div>', unsafe_allow_html=True)
-    cam_img = st.camera_input("📷 Scan Braille with Camera")
+    st.markdown("""
+    <div style="background:#1e3a5f; border-radius:10px; padding:12px 16px; color:#90CAF9; font-size:0.9rem; margin-bottom:12px;">
+        📸 Point camera at Braille text. Good lighting gives best results.
+    </div>
+    """, unsafe_allow_html=True)
+
+    cam_img = st.camera_input("📷 Scan Braille")
     if cam_img:
         img = Image.open(cam_img).convert("RGB")
         img_array = np.array(img)
-        with st.spinner("🔍 Analyzing Braille dots..."):
+        with st.spinner("🔍 Analyzing Braille..."):
             sentence, confidences, annotated = find_and_predict_all(img_array)
         if sentence:
             st.divider()
-            st.markdown("### 📝 Recognition Result")
             show_results(sentence, confidences, annotated)
         else:
-            st.warning("⚠️ No Braille cells detected. Try again with better lighting.")
+            st.warning("⚠️ No Braille detected. Try again.")
 
 # ── FOOTER ──
 st.divider()
 st.markdown("""
-<div class="footer">
+<div style="text-align:center; color:#555; font-size:0.8rem; padding:10px;">
     Built with ❤️ for BrailleVision Hackathon 2026 &nbsp;|&nbsp;
-    OpenCV + CNN + ONNX + Streamlit &nbsp;|&nbsp;
-    Helping the visually impaired 👁️
+    OpenCV + CNN + ONNX + Streamlit &nbsp;|&nbsp; Helping the visually impaired 👁️
 </div>
 """, unsafe_allow_html=True)
