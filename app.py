@@ -15,7 +15,7 @@ st.markdown("""
 <style>
 * { font-family: 'Segoe UI', sans-serif; }
 .hero {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #007791 0%, #005f73 100%);
     padding: 50px 30px;
     border-radius: 24px;
     text-align: center;
@@ -49,40 +49,12 @@ st.markdown("""
     height: 100%;
     border-left: 5px solid;
 }
-.result-card {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    border-radius: 20px;
-    padding: 30px;
-    text-align: center;
-    color: white;
-    box-shadow: 0 10px 30px rgba(102,126,234,0.4);
-    margin: 15px 0;
-}
-.result-text {
-    font-size: 4rem;
-    font-weight: 900;
-    letter-spacing: 12px;
-    color: white;
-}
-.result-label {
-    font-size: 0.9rem;
-    opacity: 0.8;
-    margin-bottom: 8px;
-}
-.conf-card {
-    border-radius: 12px;
-    padding: 14px 20px;
-    text-align: center;
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 10px 0;
-}
 .tip-box {
-    background: #EEF2FF;
-    border-left: 4px solid #667eea;
+    background: #E0F7FA;
+    border-left: 4px solid #007791;
     border-radius: 10px;
     padding: 12px 16px;
-    color: #4338CA;
+    color: #005f73;
     font-size: 0.9rem;
     margin-bottom: 14px;
 }
@@ -150,9 +122,9 @@ def find_and_predict_all(image_array):
         letter, confidence = predict_cell(cell)
         result_letters.append(letter)
         result_confidences.append(confidence)
-        cv2.rectangle(annotated, (x_start, 0), (x_end, h), (102, 126, 234), 3)
+        cv2.rectangle(annotated, (x_start, 0), (x_end, h), (0, 119, 145), 3)
         cv2.putText(annotated, letter.upper(), (x_start + 4, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (102, 126, 234), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 119, 145), 2)
     sentence = "".join(result_letters)
     return sentence, result_confidences, annotated
 
@@ -163,13 +135,23 @@ def speak(text):
     return tmp.name
 
 def show_results(sentence, confidences, annotated):
+    # Result box
     st.markdown(f"""
-    <div class="result-card">
-        <div class="result-label">✅ Recognized Braille Text</div>
-        <div class="result-text">{sentence.upper()}</div>
+    <div style="
+        background: linear-gradient(135deg, #007791, #005f73);
+        border-radius: 20px;
+        padding: 30px;
+        text-align: center;
+        color: white;
+        box-shadow: 0 10px 30px rgba(0,119,145,0.4);
+        margin: 15px 0;
+    ">
+        <div style="font-size:0.9rem; opacity:0.85; margin-bottom:8px;">✅ Recognized Braille Text</div>
+        <div style="font-size:4rem; font-weight:900; letter-spacing:12px;">{sentence.upper()}</div>
     </div>
     """, unsafe_allow_html=True)
 
+    # Confidence
     if confidences:
         avg = sum(confidences) / len(confidences)
         if avg > 90:
@@ -179,22 +161,39 @@ def show_results(sentence, confidences, annotated):
         else:
             bg, color, label = "#FEE2E2", "#991B1B", f"⚠️ {avg:.1f}% — Low"
         st.markdown(f"""
-        <div class="conf-card" style="background:{bg}; color:{color};">
+        <div style="
+            background:{bg};
+            color:{color};
+            border-radius:12px;
+            padding:14px 20px;
+            text-align:center;
+            font-size:1rem;
+            font-weight:600;
+            margin:10px 0;
+        ">
             🎯 Model Confidence: {label}
         </div>
         """, unsafe_allow_html=True)
 
+    # Image and button
     col1, col2 = st.columns([1, 1])
     with col1:
         st.image(annotated, caption="Detected Cells", width=220)
     with col2:
-        st.markdown("##### 🔊 Text to Speech")
+        st.markdown("""
+        <div style="padding-top:10px;">
+            <div style="color:#007791; font-weight:700; font-size:1rem; margin-bottom:10px;">
+                🔊 Text to Speech
+            </div>
+            <div style="color:#555; font-size:0.85rem; margin-bottom:12px;">
+                Click below to hear the recognized Braille text read aloud
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         if st.button("▶️ Read Aloud", use_container_width=True, type="primary"):
             with st.spinner("Generating audio..."):
                 audio = speak(sentence)
                 st.audio(audio)
-        st.markdown("##### 📋 Recognized Text")
-        st.code(sentence.upper(), language=None)
 
 # ── HERO ──
 st.markdown("""
@@ -209,22 +208,22 @@ st.markdown("""
 c1, c2, c3 = st.columns(3)
 with c1:
     st.markdown("""
-    <div class="stat-card" style="border-color:#667eea;">
-        <div style="font-size:2.2rem;font-weight:900;color:#667eea;">99%</div>
+    <div class="stat-card" style="border-color:#007791;">
+        <div style="font-size:2.2rem;font-weight:900;color:#007791;">99%</div>
         <div style="color:#666;font-size:0.9rem;">🧠 Model Accuracy</div>
     </div>
     """, unsafe_allow_html=True)
 with c2:
     st.markdown("""
-    <div class="stat-card" style="border-color:#764ba2;">
-        <div style="font-size:2.2rem;font-weight:900;color:#764ba2;">26</div>
+    <div class="stat-card" style="border-color:#005f73;">
+        <div style="font-size:2.2rem;font-weight:900;color:#005f73;">26</div>
         <div style="color:#666;font-size:0.9rem;">🔤 Braille Classes (A–Z)</div>
     </div>
     """, unsafe_allow_html=True)
 with c3:
     st.markdown("""
-    <div class="stat-card" style="border-color:#06B6D4;">
-        <div style="font-size:2.2rem;font-weight:900;color:#06B6D4;">Live</div>
+    <div class="stat-card" style="border-color:#0a9396;">
+        <div style="font-size:2.2rem;font-weight:900;color:#0a9396;">Live</div>
         <div style="color:#666;font-size:0.9rem;">⚡ Real-time Camera</div>
     </div>
     """, unsafe_allow_html=True)
@@ -236,25 +235,25 @@ with st.expander("🔍 How BrailleVision Works", expanded=False):
     s1, s2, s3 = st.columns(3)
     with s1:
         st.markdown("""
-        <div class="step-card" style="border-color:#667eea;">
+        <div class="step-card" style="border-color:#007791;">
             <div style="font-size:1.8rem;">📷</div>
-            <div style="font-weight:700;color:#667eea;margin:6px 0;">Step 1 — Capture</div>
+            <div style="font-weight:700;color:#007791;margin:6px 0;">Step 1 — Capture</div>
             <div style="color:#555;font-size:0.88rem;">Upload a photo or use live camera to scan physical Braille</div>
         </div>
         """, unsafe_allow_html=True)
     with s2:
         st.markdown("""
-        <div class="step-card" style="border-color:#764ba2;">
+        <div class="step-card" style="border-color:#005f73;">
             <div style="font-size:1.8rem;">🔬</div>
-            <div style="font-weight:700;color:#764ba2;margin:6px 0;">Step 2 — Detect</div>
+            <div style="font-weight:700;color:#005f73;margin:6px 0;">Step 2 — Detect</div>
             <div style="color:#555;font-size:0.88rem;">OpenCV processes image, finds Braille dots and segments cells</div>
         </div>
         """, unsafe_allow_html=True)
     with s3:
         st.markdown("""
-        <div class="step-card" style="border-color:#06B6D4;">
+        <div class="step-card" style="border-color:#0a9396;">
             <div style="font-size:1.8rem;">🧠</div>
-            <div style="font-weight:700;color:#06B6D4;margin:6px 0;">Step 3 — Predict</div>
+            <div style="font-weight:700;color:#0a9396;margin:6px 0;">Step 3 — Predict</div>
             <div style="color:#555;font-size:0.88rem;">CNN model predicts each letter and reads text aloud</div>
         </div>
         """, unsafe_allow_html=True)
